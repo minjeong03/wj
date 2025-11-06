@@ -77,34 +77,43 @@
     // 👉 Google Apps Script URL로 교체하세요
     const GAS_URL = "https://script.google.com/macros/s/AKfycby8nkwH7I5hp7S0aVCK2jGP4C7UelXDumpg-osvsvUhtPDZnAAmqGl3FqzqWNsCPY2E/exec";
 
-    const input = document.getElementById("todoInput");
-    const saveBtn = document.getElementById("saveBtn");
-    const list = document.getElementById("todoList");
+  const input = document.getElementById("todoInput");
+  const saveBtn = document.getElementById("saveBtn");
+  const list = document.getElementById("todoList");
 
-    // 📤 Todo 저장
-    async function saveTodo() {
-      const todo = input.value.trim();
-      if (!todo) return alert("할 일을 입력하세요!");
+  // 📤 Todo 저장
+  async function saveTodo() {
+    const todo = input.value.trim();
+    if (!todo) return alert("할 일을 입력하세요!");
 
+    try {
       const res = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "add", todo }),
       });
 
-      const data = await res.json();
+      const text = await res.text(); // ✅ HtmlService는 text()로 받아야 함
+      const data = JSON.parse(text);
+
       if (data.success) {
         input.value = "";
-        loadTodos(); // 새로고침 없이 목록 갱신
+        await loadTodos(); // 새로고침 없이 목록 갱신
       } else {
         alert("저장 실패!");
       }
+    } catch (err) {
+      console.error("저장 중 오류:", err);
+      alert("서버 연결에 실패했습니다 😢");
     }
+  }
 
-    // 📥 Todo 불러오기
-    async function loadTodos() {
+  // 📥 Todo 불러오기
+  async function loadTodos() {
+    try {
       const res = await fetch(GAS_URL + "?action=list");
-      const todos = await res.json();
+      const text = await res.text(); // ✅ HtmlService는 JSON이 문자열로 옴
+      const todos = JSON.parse(text);
 
       list.innerHTML = "";
       todos.forEach((item, i) => {
@@ -112,6 +121,7 @@
         li.textContent = item.text;
         li.classList.toggle("done", item.done);
         li.addEventListener("click", () => toggleDone(i));
+
         const del = document.createElement("button");
         del.textContent = "✕";
         del.className = "delete";
@@ -119,33 +129,53 @@
           e.stopPropagation();
           deleteTodo(i);
         });
+
         li.appendChild(del);
         list.appendChild(li);
       });
+    } catch (err) {
+      console.error("불러오기 실패:", err);
+      list.innerHTML = "<li style='color:gray'>데이터를 불러오지 못했습니다.</li>";
     }
+  }
 
-    // ✅ 완료/취소 토글
-    async function toggleDone(index) {
-      await fetch(GAS_URL, {
+  // ✅ 완료/취소 토글
+  async function toggleDone(index) {
+    try {
+      const res = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle", index }),
       });
-      loadTodos();
-    }
 
-    // ❌ 삭제
-    async function deleteTodo(index) {
-      await fetch(GAS_URL, {
+      const text = await res.text();
+      const result = JSON.parse(text);
+      if (result.success) loadTodos();
+    } catch (err) {
+      console.error("토글 실패:", err);
+    }
+  }
+
+  // ❌ 삭제
+  async function deleteTodo(index) {
+    try {
+      const res = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "delete", index }),
       });
-      loadTodos();
-    }
 
-    saveBtn.addEventListener("click", saveTodo);
-    window.addEventListener("load", loadTodos);
+      const text = await res.text();
+      const result = JSON.parse(text);
+      if (result.success) loadTodos();
+    } catch (err) {
+      console.error("삭제 실패:", err);
+    }
+  }
+
+  // 초기 로드
+  saveBtn.addEventListener("click", saveTodo);
+  window.addEventListener("load", loadTodos);
   </script>
 </body>
 </html>
