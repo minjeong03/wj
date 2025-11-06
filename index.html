@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My To-Do List</title>
+  <style>
+    body {
+      font-family: "Pretendard", sans-serif;
+      background: #f7f7f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 10px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    #todoInput {
+      width: 250px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    #saveBtn {
+      margin-left: 8px;
+      padding: 10px 16px;
+      background-color: #007aff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #saveBtn:hover {
+      background-color: #005fcb;
+    }
+    ul {
+      margin-top: 30px;
+      list-style: none;
+      padding: 0;
+      width: 300px;
+    }
+    li {
+      background: white;
+      margin-bottom: 8px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    li.done {
+      text-decoration: line-through;
+      color: #888;
+    }
+    button.delete {
+      background: none;
+      border: none;
+      color: #d33;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>오늘의 할 일</h1>
+  <div>
+    <input id="todoInput" type="text" placeholder="할 일을 입력하세요" />
+    <button id="saveBtn">저장</button>
+  </div>
+
+  <ul id="todoList"></ul>
+
+  <script>
+    // 👉 Google Apps Script URL로 교체하세요
+    const GAS_URL = "https://script.google.com/macros/s/AKfycby8nkwH7I5hp7S0aVCK2jGP4C7UelXDumpg-osvsvUhtPDZnAAmqGl3FqzqWNsCPY2E/exec";
+
+    const input = document.getElementById("todoInput");
+    const saveBtn = document.getElementById("saveBtn");
+    const list = document.getElementById("todoList");
+
+    // 📤 Todo 저장
+    async function saveTodo() {
+      const todo = input.value.trim();
+      if (!todo) return alert("할 일을 입력하세요!");
+
+      const res = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add", todo }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        input.value = "";
+        loadTodos(); // 새로고침 없이 목록 갱신
+      } else {
+        alert("저장 실패!");
+      }
+    }
+
+    // 📥 Todo 불러오기
+    async function loadTodos() {
+      const res = await fetch(GAS_URL + "?action=list");
+      const todos = await res.json();
+
+      list.innerHTML = "";
+      todos.forEach((item, i) => {
+        const li = document.createElement("li");
+        li.textContent = item.text;
+        li.classList.toggle("done", item.done);
+        li.addEventListener("click", () => toggleDone(i));
+        const del = document.createElement("button");
+        del.textContent = "✕";
+        del.className = "delete";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteTodo(i);
+        });
+        li.appendChild(del);
+        list.appendChild(li);
+      });
+    }
+
+    // ✅ 완료/취소 토글
+    async function toggleDone(index) {
+      await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle", index }),
+      });
+      loadTodos();
+    }
+
+    // ❌ 삭제
+    async function deleteTodo(index) {
+      await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", index }),
+      });
+      loadTodos();
+    }
+
+    saveBtn.addEventListener("click", saveTodo);
+    window.addEventListener("load", loadTodos);
+  </script>
+</body>
+</html>
