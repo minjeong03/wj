@@ -24,7 +24,7 @@
       border-radius: 6px;
       font-size: 16px;
     }
-    #saveBtn {
+    #saveBtn, #clearBtn {
       margin-left: 8px;
       padding: 10px 16px;
       background-color: #007aff;
@@ -33,7 +33,7 @@
       border-radius: 6px;
       cursor: pointer;
     }
-    #saveBtn:hover {
+    #saveBtn:hover, #clearBtn:hover {
       background-color: #005fcb;
     }
     ul {
@@ -63,6 +63,21 @@
       cursor: pointer;
       font-size: 16px;
     }
+    /* 🌀 로딩 스피너 */
+    #spinner {
+      display: none;
+      margin-top: 30px;
+      border: 4px solid #eee;
+      border-top: 4px solid #007aff;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -70,8 +85,10 @@
   <div>
     <input id="todoInput" type="text" placeholder="할 일을 입력하세요" />
     <button id="saveBtn">저장</button>
+    <button id="clearBtn" style="background-color:#ff3b30">지난 항목 정리</button>
   </div>
 
+  <div id="spinner"></div>
   <ul id="todoList"></ul>
 
   <script>
@@ -84,17 +101,23 @@
 
     const input = document.getElementById("todoInput");
     const saveBtn = document.getElementById("saveBtn");
+    const clearBtn = document.getElementById("clearBtn");
     const list = document.getElementById("todoList");
+    const spinner = document.getElementById("spinner");
+
+    function showSpinner(show) {
+      spinner.style.display = show ? "block" : "none";
+    }
 
     // 📥 Todo 목록 불러오기
     async function loadTodos() {
+      showSpinner(true);
       try {
         const res = await fetch(
           PROXY_URL + encodeURIComponent(GAS_URL + "?action=list")
         );
         const text = await res.text();
         const todos = JSON.parse(text);
-
         list.innerHTML = "";
         todos.forEach((item, i) => {
           const li = document.createElement("li");
@@ -115,8 +138,9 @@
         });
       } catch (err) {
         console.error("목록 로드 실패:", err);
-        list.innerHTML =
-          "<li style='color:gray'>데이터를 불러올 수 없습니다. 😢</li>";
+        list.innerHTML = "<li style='color:gray'>데이터를 불러올 수 없습니다. 😢</li>";
+      } finally {
+        showSpinner(false);
       }
     }
 
@@ -125,64 +149,93 @@
       const todo = input.value.trim();
       if (!todo) return alert("할 일을 입력하세요!");
 
+      showSpinner(true);
       try {
         const res = await fetch(PROXY_URL + encodeURIComponent(GAS_URL), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "add", todo }),
         });
-
         const text = await res.text();
         const data = JSON.parse(text);
-
         if (data.success) {
           input.value = "";
-          loadTodos();
+          await loadTodos();
         } else {
           alert("저장 실패!");
         }
       } catch (err) {
         console.error("저장 오류:", err);
         alert("서버 연결에 실패했습니다 😢");
+      } finally {
+        showSpinner(false);
       }
     }
 
     // ✅ 완료/취소 토글
     async function toggleDone(index) {
+      showSpinner(true);
       try {
         const res = await fetch(PROXY_URL + encodeURIComponent(GAS_URL), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "toggle", index }),
         });
-
         const text = await res.text();
         const result = JSON.parse(text);
-        if (result.success) loadTodos();
+        if (result.success) await loadTodos();
       } catch (err) {
         console.error("토글 실패:", err);
+      } finally {
+        showSpinner(false);
       }
     }
 
     // ❌ 삭제
     async function deleteTodo(index) {
+      showSpinner(true);
       try {
         const res = await fetch(PROXY_URL + encodeURIComponent(GAS_URL), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "delete", index }),
         });
-
         const text = await res.text();
         const result = JSON.parse(text);
-        if (result.success) loadTodos();
+        if (result.success) await loadTodos();
       } catch (err) {
         console.error("삭제 실패:", err);
+      } finally {
+        showSpinner(false);
       }
     }
 
-    // 초기 로드
+    // 🧹 지난 항목 정리
+    async function clearOldTodos() {
+      if (!confirm("오늘 날짜가 아닌 모든 할 일을 삭제할까요?")) return;
+
+      showSpinner(true);
+      try {
+        const res = await fetch(
+          PROXY_URL + encodeURIComponent(GAS_URL + "?action=clearOld")
+        );
+        const text = await res.text();
+        const result = JSON.parse(text);
+        if (result.success) {
+          await loadTodos();
+        } else {
+        }
+      } catch (err) {
+        console.error("정리 실패:", err);
+        alert("정리 중 오류 발생");
+      } finally {
+        showSpinner(false);
+      }
+    }
+
+    // 이벤트 바인딩
     saveBtn.addEventListener("click", saveTodo);
+    clearBtn.addEventListener("click", clearOldTodos);
     window.addEventListener("load", loadTodos);
   </script>
 </body>
