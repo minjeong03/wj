@@ -220,7 +220,6 @@
           PROXY_URL + encodeURIComponent(GAS_URL + "?action=clearOld")
         );
         const text = await res.text();
-		console.log(text);
         const result = JSON.parse(text);
         if (result.success) {
           await loadTodos();
