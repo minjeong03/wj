@@ -61,6 +61,7 @@
       border: none;
       color: #d33;
       cursor: pointer;
+      font-size: 16px;
     }
   </style>
 </head>
@@ -74,108 +75,115 @@
   <ul id="todoList"></ul>
 
   <script>
-    // 👉 Google Apps Script URL로 교체하세요
-    const GAS_URL = "https://script.google.com/macros/s/AKfycby8nkwH7I5hp7S0aVCK2jGP4C7UelXDumpg-osvsvUhtPDZnAAmqGl3FqzqWNsCPY2E/exec";
+    // ✅ Google Apps Script Web App URL
+    const GAS_URL =
+      "https://script.google.com/macros/s/AKfycby8nkwH7I5hp7S0aVCK2jGP4C7UelXDumpg-osvsvUhtPDZnAAmqGl3FqzqWNsCPY2E/exec";
 
-  const input = document.getElementById("todoInput");
-  const saveBtn = document.getElementById("saveBtn");
-  const list = document.getElementById("todoList");
+    // ✅ Cloudflare Worker Proxy URL (자신의 Worker 주소로 교체)
+    const PROXY_URL = "https://lingering-silence-aad0.minjeongkim-digipen.workers.dev/?url=";
 
-  // 📤 Todo 저장
-  async function saveTodo() {
-    const todo = input.value.trim();
-    if (!todo) return alert("할 일을 입력하세요!");
+    const input = document.getElementById("todoInput");
+    const saveBtn = document.getElementById("saveBtn");
+    const list = document.getElementById("todoList");
 
-    try {
-      const res = await fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "add", todo }),
-      });
+    // 📥 Todo 목록 불러오기
+    async function loadTodos() {
+      try {
+        const res = await fetch(
+          PROXY_URL + encodeURIComponent(GAS_URL + "?action=list")
+        );
+        const text = await res.text();
+        const todos = JSON.parse(text);
 
-      const text = await res.text(); // ✅ HtmlService는 text()로 받아야 함
-      const data = JSON.parse(text);
+        list.innerHTML = "";
+        todos.forEach((item, i) => {
+          const li = document.createElement("li");
+          li.textContent = item.text;
+          li.classList.toggle("done", item.done);
+          li.addEventListener("click", () => toggleDone(i));
 
-      if (data.success) {
-        input.value = "";
-        await loadTodos(); // 새로고침 없이 목록 갱신
-      } else {
-        alert("저장 실패!");
+          const del = document.createElement("button");
+          del.textContent = "✕";
+          del.className = "delete";
+          del.addEventListener("click", (e) => {
+            e.stopPropagation();
+            deleteTodo(i);
+          });
+
+          li.appendChild(del);
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("목록 로드 실패:", err);
+        list.innerHTML =
+          "<li style='color:gray'>데이터를 불러올 수 없습니다. 😢</li>";
       }
-    } catch (err) {
-      console.error("저장 중 오류:", err);
-      alert("서버 연결에 실패했습니다 😢");
     }
-  }
 
-  // 📥 Todo 불러오기
-  async function loadTodos() {
-    try {
-      const res = await fetch(GAS_URL + "?action=list");
-      const text = await res.text(); // ✅ HtmlService는 JSON이 문자열로 옴
-      const todos = JSON.parse(text);
+    // 📤 Todo 저장
+    async function saveTodo() {
+      const todo = input.value.trim();
+      if (!todo) return alert("할 일을 입력하세요!");
 
-      list.innerHTML = "";
-      todos.forEach((item, i) => {
-        const li = document.createElement("li");
-        li.textContent = item.text;
-        li.classList.toggle("done", item.done);
-        li.addEventListener("click", () => toggleDone(i));
-
-        const del = document.createElement("button");
-        del.textContent = "✕";
-        del.className = "delete";
-        del.addEventListener("click", (e) => {
-          e.stopPropagation();
-          deleteTodo(i);
+      try {
+        const res = await fetch(PROXY_URL + encodeURIComponent(GAS_URL), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "add", todo }),
         });
 
-        li.appendChild(del);
-        list.appendChild(li);
-      });
-    } catch (err) {
-      console.error("불러오기 실패:", err);
-      list.innerHTML = "<li style='color:gray'>데이터를 불러오지 못했습니다.</li>";
+        const text = await res.text();
+        const data = JSON.parse(text);
+
+        if (data.success) {
+          input.value = "";
+          loadTodos();
+        } else {
+          alert("저장 실패!");
+        }
+      } catch (err) {
+        console.error("저장 오류:", err);
+        alert("서버 연결에 실패했습니다 😢");
+      }
     }
-  }
 
-  // ✅ 완료/취소 토글
-  async function toggleDone(index) {
-    try {
-      const res = await fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "toggle", index }),
-      });
+    // ✅ 완료/취소 토글
+    async function toggleDone(index) {
+      try {
+        const res = await fetch(PROXY_URL + encodeURIComponent(GAS_URL), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "toggle", index }),
+        });
 
-      const text = await res.text();
-      const result = JSON.parse(text);
-      if (result.success) loadTodos();
-    } catch (err) {
-      console.error("토글 실패:", err);
+        const text = await res.text();
+        const result = JSON.parse(text);
+        if (result.success) loadTodos();
+      } catch (err) {
+        console.error("토글 실패:", err);
+      }
     }
-  }
 
-  // ❌ 삭제
-  async function deleteTodo(index) {
-    try {
-      const res = await fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", index }),
-      });
+    // ❌ 삭제
+    async function deleteTodo(index) {
+      try {
+        const res = await fetch(PROXY_URL + encodeURIComponent(GAS_URL), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "delete", index }),
+        });
 
-      const text = await res.text();
-      const result = JSON.parse(text);
-      if (result.success) loadTodos();
-    } catch (err) {
-      console.error("삭제 실패:", err);
+        const text = await res.text();
+        const result = JSON.parse(text);
+        if (result.success) loadTodos();
+      } catch (err) {
+        console.error("삭제 실패:", err);
+      }
     }
-  }
 
-  // 초기 로드
-  saveBtn.addEventListener("click", saveTodo);
-  window.addEventListener("load", loadTodos);
+    // 초기 로드
+    saveBtn.addEventListener("click", saveTodo);
+    window.addEventListener("load", loadTodos);
   </script>
 </body>
 </html>
