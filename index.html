@@ -219,12 +219,7 @@
         const res = await fetch(
           PROXY_URL + encodeURIComponent(GAS_URL + "?action=clearOld")
         );
-        const text = await res.text();
-        const result = JSON.parse(text);
-        if (result.success) {
-          await loadTodos();
-        } else {
-        }
+   
       } catch (err) {
         console.error("정리 실패:", err);
         alert("정리 중 오류 발생");
